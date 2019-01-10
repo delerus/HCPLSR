@@ -164,12 +164,6 @@ class Hcplsr():
             self.ypredgr[small_rows,:] = self.ypred[small_rows]
 
 
-    
-
-
-
-                
-
 
     def add_terms(self,X,fit=False):
 

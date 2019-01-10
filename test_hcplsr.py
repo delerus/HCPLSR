@@ -128,9 +128,4 @@ def test_T_matrix(test_data,pca_scaled_secondorder):
         assert approx(abs(hcplsr.T[:,i])) == abs(matlab_results['T'][:,i])
     assert hcplsr.pca_PCs == matlab_results['PCs'] 
 
-def test_fuzzy_predictor():
-    pass
-
-
-
 
