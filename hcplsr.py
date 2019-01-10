@@ -18,7 +18,7 @@ from sklearn_extensions.fuzzy_kmeans import FuzzyKMeans
 
 class Hcplsr():
 
-    def __init__(self,matrix='T',n_clusters=6,standard_X=True,standard_Y=True,sincos=False,secondorder=False,m=2,n_comps=10):
+    def __init__(self,matrix='T',n_clusters=6,standard_X=True,standard_Y=True,sincos=False,secondorder=False,m=2,n_comps=10,pca_standard=False):
         """
         Docstring for the HCPLSR
 
@@ -35,6 +35,8 @@ class Hcplsr():
         self.secondorder=secondorder
 
         self.n_comps = n_comps
+
+        self.pca_standard = pca_standard
 
 
     def fit(self,X,Y):
@@ -74,28 +76,42 @@ class Hcplsr():
 
         #Choosing matrix
         if self.matrix == 'Xscores':
-            matr = self.gplsr.x_scores_[:,:self.opt_PCs]
+            self.matr = self.gplsr.x_scores_[:,:self.opt_PCs]
         elif self.matrix == 'Yscores':
-            matr = self.gplsr.y_scores_[:,:self.opt_PCs]
+            self.matr = self.gplsr.y_scores_[:,:self.opt_PCs]
         elif self.matrix == 'T':
             #The data is not standarized before pca is used in matlab file.
             #But I will use standarized data for now.
+
+            if self.secondorder:
+
+                pf = PolynomialFeatures(degree=2,include_bias=False,interaction_only=True)
+                X = np.copy(self.X_org)
+                X = X[:,:]-self.mX_0
+                X_temp = pf.fit_transform(X)
+                X = np.concatenate((X_temp,X**2),axis=1)
+
+            if self.pca_standard:
+                for col in range(X.shape[1]):
+                    X[:,col] = (X[:,col] - self.mX[col])/self.stdX[col]
+
+
             self.pca = PCA()
-            T = self.pca.fit_transform(X)
+            self.T = self.pca.fit_transform(X)
             var = self.pca.explained_variance_
 
             self.pca_PCs = 1
             for i in range(1,len(var)):
                 diff = abs(var[i]-var[i-1])
-                if diff > 0.01*var[0] and self.pca_PCs > len(var)-1:
+                if diff > 0.01*var[0] and self.pca_PCs < len(var)-1:
                     self.pca_PCs=i+1
-            matr = T[:,:self.pca_PCs]
+            self.matr = self.T[:,:self.pca_PCs]
 
         #Clustering
 
-        fk = FuzzyKMeans(k=self.n_clusters, m=self.m).fit(matr)
+        fk = FuzzyKMeans(k=self.n_clusters, m=self.m).fit(self.matr)
         self.cluster_centers = fk.cluster_centers_
-        D,U = self.fuzzy_predictor(matr)
+        D,U = self.fuzzy_predictor(self.matr)
         self.labels = np.argmax(U, axis=1)
 
         #Removing small clusters
@@ -106,11 +122,11 @@ class Hcplsr():
 
         if del_class:
             if del_class == self.n_clusters:
-                self.labels = np.ones(matr.shape[0])
+                self.labels = np.ones(self.matr.shape[0])
                 print('only one cluster, only gplsr created')
             else:
                 self.cluster_centers = self.cluster_centers[class_ok,:]
-                D,U = self.fuzzy_predictor(matr)
+                D,U = self.fuzzy_predictor(self.matr)
                 self.labels = np.argmax(U, axis=1)
                 self.labels[small_rows] = -1
 
@@ -123,7 +139,7 @@ class Hcplsr():
         
         self.optPCgr = []
         self.lplsr = []
-        ypredgr = np.zeros_like(Y)
+        self.ypredgr = np.zeros_like(Y)
 
         for i in range(self.n_clusters):
             sample_index = self.labels==i
@@ -142,10 +158,10 @@ class Hcplsr():
 
             self.optPCgr.append(min(self.opt_PCs,Xgr.shape[0])) # This should be changed to optimal
             self.lplsr.append(PLSRegression(n_components=self.optPCgr[i],scale=False).fit(Xgr,Ygr))
-            ypredgr[sample_index,:] = self.lplsr[i].predict(Xgr)
+            self.ypredgr[sample_index,:] = self.lplsr[i].predict(Xgr)
 
         if small_rows:
-            ypredgr[small_rows,:] = self.ypred[small_rows]
+            self.ypredgr[small_rows,:] = self.ypred[small_rows]
 
 
     

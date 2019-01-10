@@ -14,6 +14,8 @@ from copy import copy
 
 from hcplsr import Hcplsr
 
+from sklearn.metrics import r2_score
+
 
 
 
@@ -102,7 +104,7 @@ def test_standardize(test_data,pca_scaled_secondorder):
     matlab_results = pca_scaled_secondorder
     X,Y = test_data
     
-    hcplsr = Hcplsr(standard_X=True,standard_Y=True,secondorder=True)
+    hcplsr = Hcplsr(matrix='T',standard_X=True,standard_Y=True,secondorder=True)
     hcplsr.fit(X,Y)
 
 
@@ -111,6 +113,23 @@ def test_standardize(test_data,pca_scaled_secondorder):
     assert approx(hcplsr.stdY) == matlab_results['stdY'][0]
     assert approx(hcplsr.mX) == matlab_results['mX_2'][0]
     assert approx(hcplsr.stdX) == matlab_results['stdX'][0]
+
+
+def test_T_matrix(test_data,pca_scaled_secondorder):
+
+    matlab_results = pca_scaled_secondorder
+    X,Y = test_data
+
+    hcplsr = Hcplsr(matrix='T',standard_X=True,standard_Y=True,secondorder=True,pca_standard=False)
+    hcplsr.fit(X,Y)
+
+    print(r2_score(Y,hcplsr.ypredgr))
+    for i in range(hcplsr.T.shape[1]):
+        assert approx(abs(hcplsr.T[:,i])) == abs(matlab_results['T'][:,i])
+    assert hcplsr.pca_PCs == matlab_results['PCs'] 
+
+def test_fuzzy_predictor():
+    pass
 
 
 
